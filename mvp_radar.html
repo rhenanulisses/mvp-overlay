@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>MVP Radar</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+      html, body {
+        margin: 0;
+        padding: 0;
+        background: transparent;
+        overflow: hidden;
+      }
+      #wrapper {
+        width: 800px;
+        height: 800px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      #radarCanvas {
+        width: 700px;
+        height: 700px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="wrapper">
+      <canvas id="radarCanvas"></canvas>
+    </div>
+
+    <script>
+      // URL do CSV publicado da aba MVP_CHART
+      const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ-jzSMIacK_jFcOzplWPpKRFS4rAJiQZvzKtcV8fUfp_WCU5BI52cVWhQ2dnO7mbc3yB-Bm7tZ-iC1/pub?gid=1084679039&single=true&output=csv";
+
+      function parseNumber(value, isTime) {
+        value = value.trim();
+
+        if (isTime) {
+          // formato mm:ss
+          const parts = value.split(":");
+          const m = parseInt(parts[0] || "0", 10);
+          const s = parseInt(parts[1] || "0", 10);
+          return m + s / 60;
+        } else {
+          // converte decimal brasileiro, exemplo 2.175,51 para 2175.51
+          const cleaned = value.replace(/\./g, "").replace(",", ".");
+          const num = parseFloat(cleaned);
+          return isNaN(num) ? 0 : num;
+        }
+      }
+
+      async function loadData() {
+        const resp = await fetch(CSV_URL);
+        const text = await resp.text();
+
+        const lines = text.trim().split("\n");
+        const labels = [];
+        const geralRaw = [];
+        const mvpRaw = [];
+
+        // linha 0 é cabeçalho, começa da 1
+        for (let i = 1; i < lines.length; i++) {
+          const line = lines[i].trim();
+          if (!line) continue;
+
+          // CSV pt BR vem separado por ponto e vírgula
+          const parts = line.split(";");
+          if (parts.length < 3) continue;
+
+          const metric = parts[0].trim();
+          const geralStr = parts[1].trim();
+          const mvpStr = parts[2].trim();
+
+          const isTime =
+            metric.toLowerCase().includes("svt") ||
+            metric.toLowerCase().includes("survive") ||
+            metric.toLowerCase().includes("tempo");
+
+          const geralVal = parseNumber(geralStr, isTime);
+          const mvpVal = parseNumber(mvpStr, isTime);
+
+          labels.push(metric);
+          geralRaw.push(geralVal);
+          mvpRaw.push(mvpVal);
+        }
+
+        // normaliza cada métrica entre 0 e 100 para comparar formato
+        const geralNorm = [];
+        const mvpNorm = [];
+
+        for (let i = 0; i < labels.length; i++) {
+          const maxVal = Math.max(geralRaw[i], mvpRaw[i]);
+          const safeMax = maxVal === 0 ? 1 : maxVal;
+          geralNorm.push((geralRaw[i] / safeMax) * 100);
+          mvpNorm.push((mvpRaw[i] / safeMax) * 100);
+        }
+
+        return { labels, geralNorm, mvpNorm };
+      }
+
+      async function buildChart() {
+        const { labels, geralNorm, mvpNorm } = await loadData();
+
+        const ctx = document.getElementById("radarCanvas").getContext("2d");
+
+        new Chart(ctx, {
+          type: "radar",
+          data: {
+            labels,
+            datasets: [
+              {
+                label: "MVP",
+                data: mvpNorm,
+                borderWidth: 2,
+                borderColor: "rgba(255, 255, 255, 1)",
+                backgroundColor: "rgba(0, 200, 255, 0.4)",
+                pointRadius: 3
+              },
+              {
+                label: "Média Geral",
+                data: geralNorm,
+                borderWidth: 1,
+                borderColor: "rgba(150, 150, 150, 1)",
+                backgroundColor: "rgba(150, 150, 150, 0.2)",
+                pointRadius: 2
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: {
+                display: true,
+                labels: {
+                  color: "#ffffff",
+                  font: { size: 16 }
+                }
+              }
+            },
+            scales: {
+              r: {
+                beginAtZero: true,
+                min: 0,
+                max: 100,
+                grid: {
+                  color: "rgba(255, 255, 255, 0.2)"
+                },
+                angleLines: {
+                  color: "rgba(255, 255, 255, 0.3)"
+                },
+                pointLabels: {
+                  color: "#ffffff",
+                  font: { size: 14 }
+                },
+                ticks: {
+                  display: false
+                }
+              }
+            }
+          }
+        });
+      }
+
+      buildChart().catch(err => {
+        console.error("Erro ao montar o gráfico", err);
+      });
+    </script>
+  </body>
+</html>
