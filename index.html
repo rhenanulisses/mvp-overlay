@@ -1,108 +1,151 @@
 <!doctype html>
-<html lang="en">
+<html lang="pt-BR">
   <head>
     <meta charset="utf-8" />
-    <title>MVP Radar</title>
+    <title>MVP Radar Chart</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
       html, body {
         margin: 0;
         padding: 0;
-        background: transparent;
+        background-color: transparent;
+        color: white;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         overflow: hidden;
+        height: 100vh;
+        width: 100vw;
+        display: flex;
+        align-items: center;
+        justify-content: center;
       }
+
       #wrapper {
+        position: relative;
         width: 800px;
         height: 800px;
         display: flex;
         align-items: center;
         justify-content: center;
       }
-      #radarCanvas {
-        width: 700px;
-        height: 700px;
+
+      canvas {
+        z-index: 2;
+      }
+
+      .glow-bg {
+        position: absolute;
+        width: 520px;
+        height: 520px;
+        background: radial-gradient(circle, rgba(80, 200, 255, 0.25) 0%, rgba(0,0,0,0) 70%);
+        z-index: 1;
+        pointer-events: none;
+        filter: blur(25px);
+        opacity: 0.8;
       }
     </style>
   </head>
   <body>
     <div id="wrapper">
+      <div class="glow-bg"></div>
       <canvas id="radarCanvas"></canvas>
     </div>
 
     <script>
-      // URL do CSV publicado da aba MVP_CHART
-      const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ-jzSMIacK_jFcOzplWPpKRFS4rAJiQZvzKtcV8fUfp_WCU5BI52cVWhQ2dnO7mbc3yB-Bm7tZ-iC1/pub?gid=1084679039&single=true&output=csv";
+      const CSV_URL =
+        "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ-jzSMIacK_jFcOzplWPpKRFS4rAJiQZvzKtcV8fUfp_WCU5BI52cVWhQ2dnO7mbc3yB-Bm7tZ-iC1/pub?gid=1084679039&single=true&output=csv";
 
-      function parseNumber(value, isTime) {
-        value = value.trim();
+      // Abates, Dano, Med. SVT, Rating, Assistências, Nocautes
+      const FIXED_CAPS = [30, 6000, 30, 8, 25, 30];
 
-        if (isTime) {
-          // formato mm:ss
-          const parts = value.split(":");
-          const m = parseInt(parts[0] || "0", 10);
-          const s = parseInt(parts[1] || "0", 10);
-          return m + s / 60;
-        } else {
-          // converte decimal brasileiro, exemplo 2.175,51 para 2175.51
-          const cleaned = value.replace(/\./g, "").replace(",", ".");
-          const num = parseFloat(cleaned);
-          return isNaN(num) ? 0 : num;
+      function splitCSVLine(str) {
+        const result = [];
+        let current = "";
+        let inQuote = false;
+
+        for (let i = 0; i < str.length; i++) {
+          const c = str[i];
+          if (c === '"') {
+            inQuote = !inQuote;
+          } else if (c === "," && !inQuote) {
+            result.push(current);
+            current = "";
+          } else {
+            current += c;
+          }
+        }
+        result.push(current);
+        return result;
+      }
+
+      function parseNumber(value) {
+        if (!value) return 0;
+        let clean = String(value).trim();
+        clean = clean.replace(/^"|"$/g, "");
+
+        // tempo mm:ss para minutos
+        if (clean.includes(":")) {
+          const parts = clean.split(":");
+          const m = parseFloat(parts[0]) || 0;
+          const s = parseFloat(parts[1]) || 0;
+          return m + (s / 60);
+        }
+
+        clean = clean.replace(/\s/g, "");
+        if (clean.includes(",")) {
+          clean = clean.replace(/\./g, "");
+          clean = clean.replace(",", ".");
+        }
+
+        return parseFloat(clean) || 0;
+      }
+
+      async function loadAndBuildChart() {
+        try {
+          const resp = await fetch(CSV_URL);
+          const text = await resp.text();
+          const lines = text.trim().split("\n");
+
+          if (lines.length < 2) return;
+
+          const labels = [];
+          const dataGeral = [];
+          const dataMVP = [];
+
+          // começa em 1 para pular cabeçalho
+          let metricIndex = 0;
+
+          for (let i = 1; i < lines.length && metricIndex < FIXED_CAPS.length; i++) {
+            const row = splitCSVLine(lines[i]);
+            if (row.length < 3) continue;
+
+            const label = row[0].replace(/"/g, "").trim();
+            const valGeralRaw = parseNumber(row[1]);
+            const valMVPRaw = parseNumber(row[2]);
+
+            const cap = FIXED_CAPS[metricIndex] || 1;
+
+            const normGeral = Math.min(100, (valGeralRaw / cap) * 100);
+            const normMVP = Math.min(100, (valMVPRaw / cap) * 100);
+
+            labels.push(label);
+            dataGeral.push(normGeral);
+            dataMVP.push(normMVP);
+
+            metricIndex++;
+          }
+
+          renderChart(labels, dataGeral, dataMVP);
+        } catch (err) {
+          console.error("Erro ao carregar dados:", err);
         }
       }
 
-      async function loadData() {
-        const resp = await fetch(CSV_URL);
-        const text = await resp.text();
-
-        const lines = text.trim().split("\n");
-        const labels = [];
-        const geralRaw = [];
-        const mvpRaw = [];
-
-        // linha 0 é cabeçalho, começa da 1
-        for (let i = 1; i < lines.length; i++) {
-          const line = lines[i].trim();
-          if (!line) continue;
-
-          // CSV pt BR vem separado por ponto e vírgula
-          const parts = line.split(";");
-          if (parts.length < 3) continue;
-
-          const metric = parts[0].trim();
-          const geralStr = parts[1].trim();
-          const mvpStr = parts[2].trim();
-
-          const isTime =
-            metric.toLowerCase().includes("svt") ||
-            metric.toLowerCase().includes("survive") ||
-            metric.toLowerCase().includes("tempo");
-
-          const geralVal = parseNumber(geralStr, isTime);
-          const mvpVal = parseNumber(mvpStr, isTime);
-
-          labels.push(metric);
-          geralRaw.push(geralVal);
-          mvpRaw.push(mvpVal);
-        }
-
-        // normaliza cada métrica entre 0 e 100 para comparar formato
-        const geralNorm = [];
-        const mvpNorm = [];
-
-        for (let i = 0; i < labels.length; i++) {
-          const maxVal = Math.max(geralRaw[i], mvpRaw[i]);
-          const safeMax = maxVal === 0 ? 1 : maxVal;
-          geralNorm.push((geralRaw[i] / safeMax) * 100);
-          mvpNorm.push((mvpRaw[i] / safeMax) * 100);
-        }
-
-        return { labels, geralNorm, mvpNorm };
-      }
-
-      async function buildChart() {
-        const { labels, geralNorm, mvpNorm } = await loadData();
-
+      function renderChart(labels, dataGeral, dataMVP) {
         const ctx = document.getElementById("radarCanvas").getContext("2d");
+
+        const gradientMVP = ctx.createRadialGradient(350, 350, 0, 350, 350, 350);
+        gradientMVP.addColorStop(0, "rgba(80, 200, 255, 0.55)");
+        gradientMVP.addColorStop(1, "rgba(80, 200, 255, 0.12)");
 
         new Chart(ctx, {
           type: "radar",
@@ -111,61 +154,83 @@
             datasets: [
               {
                 label: "MVP",
-                data: mvpNorm,
-                borderWidth: 2,
-                borderColor: "rgba(255, 255, 255, 1)",
-                backgroundColor: "rgba(0, 200, 255, 0.4)",
-                pointRadius: 3
+                data: dataMVP,
+                backgroundColor: gradientMVP,
+                borderColor: "#50c8ff",
+                borderWidth: 4,
+                pointBackgroundColor: "#50c8ff",
+                pointBorderColor: "#ffffff",
+                pointRadius: 6,
+                pointHoverRadius: 8,
+                fill: true
               },
               {
                 label: "Média Geral",
-                data: geralNorm,
-                borderWidth: 1,
-                borderColor: "rgba(150, 150, 150, 1)",
-                backgroundColor: "rgba(150, 150, 150, 0.2)",
-                pointRadius: 2
+                data: dataGeral,
+                backgroundColor: "rgba(255, 255, 255, 0.08)",
+                borderColor: "rgba(200, 200, 200, 0.9)",
+                borderWidth: 2,
+                pointRadius: 4,
+                pointBackgroundColor: "rgba(255, 255, 255, 0.9)",
+                pointBorderColor: "#000000",
+                fill: true
               }
             ]
           },
           options: {
             responsive: true,
             maintainAspectRatio: false,
-            plugins: {
-              legend: {
-                display: true,
-                labels: {
-                  color: "#ffffff",
-                  font: { size: 16 }
-                }
-              }
-            },
+            layout: { padding: 20 },
             scales: {
               r: {
-                beginAtZero: true,
                 min: 0,
                 max: 100,
-                grid: {
-                  color: "rgba(255, 255, 255, 0.2)"
-                },
+                beginAtZero: true,
                 angleLines: {
-                  color: "rgba(255, 255, 255, 0.3)"
+                  display: true,
+                  color: "rgba(255, 255, 255, 0.28)",
+                  lineWidth: 5
                 },
-                pointLabels: {
-                  color: "#ffffff",
-                  font: { size: 14 }
+                grid: {
+                  circular: false,
+                  color: "rgba(255, 255, 255, 0.2)",
+                  lineWidth: 5
                 },
                 ticks: {
                   display: false
+                },
+                pointLabels: {
+                  color: "white",
+                  font: {
+                    size: 14,
+                    family: "Verdana",
+                    weight: "bold"
+                  },
+                  padding: 12
                 }
               }
+            },
+            plugins: {
+              legend: {
+                display: true,
+                position: "bottom",
+                labels: {
+                  color: "white",
+                  font: { size: 12 }
+                }
+              },
+              tooltip: {
+                enabled: false
+              }
+            },
+            elements: {
+              line: { tension: 0 }
             }
           }
         });
       }
 
-      buildChart().catch(err => {
-        console.error("Erro ao montar o gráfico", err);
-      });
+      loadAndBuildChart();
     </script>
   </body>
 </html>
