@@ -1,236 +1,292 @@
 <!doctype html>
 <html lang="pt-BR">
-  <head>
-    <meta charset="utf-8" />
-    <title>MVP Radar Chart</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-      html, body {
-        margin: 0;
-        padding: 0;
-        background-color: transparent;
-        color: white;
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        overflow: hidden;
-        height: 100vh;
-        width: 100vw;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-      }
 
-      #wrapper {
-        position: relative;
-        width: 800px;
-        height: 800px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-      }
+<head>
+  <meta charset="utf-8" />
+  <title>MVP Radar Chart</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    html,
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: transparent;
+      color: white;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      overflow: hidden;
+      height: 100vh;
+      width: 100vw;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
 
-      canvas {
-        z-index: 2;
-      }
+    #wrapper {
+      position: relative;
+      width: 800px;
+      height: 800px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
 
-      .glow-bg {
-        position: absolute;
-        width: 520px;
-        height: 520px;
-        background: radial-gradient(circle, rgba(80, 200, 255, 0.25) 0%, rgba(0,0,0,0) 70%);
-        z-index: 1;
-        pointer-events: none;
-        filter: blur(25px);
-        opacity: 0.8;
-      }
-    </style>
-  </head>
-  <body>
-    <div id="wrapper">
-      <div class="glow-bg"></div>
-      <canvas id="radarCanvas"></canvas>
-    </div>
+    canvas {
+      z-index: 2;
+    }
 
-    <script>
-      const CSV_URL =
-        "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ-jzSMIacK_jFcOzplWPpKRFS4rAJiQZvzKtcV8fUfp_WCU5BI52cVWhQ2dnO7mbc3yB-Bm7tZ-iC1/pub?gid=1084679039&single=true&output=csv";
+    .glow-bg {
+      position: absolute;
+      width: 520px;
+      height: 520px;
+      background: radial-gradient(circle, rgba(80, 200, 255, 0.25) 0%, rgba(0, 0, 0, 0) 70%);
+      z-index: 1;
+      pointer-events: none;
+      filter: blur(25px);
+      opacity: 0.8;
+    }
+  </style>
+</head>
 
-      // Abates, Dano, Med. SVT, Rating, Assistências, Nocautes
-      const FIXED_CAPS = [30, 6000, 30, 8, 25, 30];
+<body>
+  <div id="wrapper">
+    <div class="glow-bg"></div>
+    <canvas id="radarCanvas"></canvas>
+  </div>
 
-      function splitCSVLine(str) {
-        const result = [];
-        let current = "";
-        let inQuote = false;
+  <script>
+    const CSV_URL =
+      "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ-jzSMIacK_jFcOzplWPpKRFS4rAJiQZvzKtcV8fUfp_WCU5BI52cVWhQ2dnO7mbc3yB-Bm7tZ-iC1/pub?gid=1084679039&single=true&output=csv";
 
-        for (let i = 0; i < str.length; i++) {
-          const c = str[i];
-          if (c === '"') {
-            inQuote = !inQuote;
-          } else if (c === "," && !inQuote) {
-            result.push(current);
-            current = "";
-          } else {
-            current += c;
-          }
-        }
-        result.push(current);
-        return result;
-      }
+    // Abates, Dano, Med. SVT, Rating, Assistências, Nocautes
+    const FIXED_CAPS = [30, 6000, 30, 8, 25, 30];
 
-      function parseNumber(value) {
-        if (!value) return 0;
-        let clean = String(value).trim();
-        clean = clean.replace(/^"|"$/g, "");
+    function splitCSVLine(str) {
+      const result = [];
+      let current = "";
+      let inQuote = false;
 
-        // tempo mm:ss para minutos
-        if (clean.includes(":")) {
-          const parts = clean.split(":");
-          const m = parseFloat(parts[0]) || 0;
-          const s = parseFloat(parts[1]) || 0;
-          return m + (s / 60);
-        }
-
-        clean = clean.replace(/\s/g, "");
-        if (clean.includes(",")) {
-          clean = clean.replace(/\./g, "");
-          clean = clean.replace(",", ".");
-        }
-
-        return parseFloat(clean) || 0;
-      }
-
-      async function loadAndBuildChart() {
-        try {
-          const resp = await fetch(CSV_URL);
-          const text = await resp.text();
-          const lines = text.trim().split("\n");
-
-          if (lines.length < 2) return;
-
-          const labels = [];
-          const dataGeral = [];
-          const dataMVP = [];
-
-          // começa em 1 para pular cabeçalho
-          let metricIndex = 0;
-
-          for (let i = 1; i < lines.length && metricIndex < FIXED_CAPS.length; i++) {
-            const row = splitCSVLine(lines[i]);
-            if (row.length < 3) continue;
-
-            const label = row[0].replace(/"/g, "").trim();
-            const valGeralRaw = parseNumber(row[1]);
-            const valMVPRaw = parseNumber(row[2]);
-
-            const cap = FIXED_CAPS[metricIndex] || 1;
-
-            const normGeral = Math.min(100, (valGeralRaw / cap) * 100);
-            const normMVP = Math.min(100, (valMVPRaw / cap) * 100);
-
-            labels.push(label);
-            dataGeral.push(normGeral);
-            dataMVP.push(normMVP);
-
-            metricIndex++;
-          }
-
-          renderChart(labels, dataGeral, dataMVP);
-        } catch (err) {
-          console.error("Erro ao carregar dados:", err);
+      for (let i = 0; i < str.length; i++) {
+        const c = str[i];
+        if (c === '"') {
+          inQuote = !inQuote;
+        } else if (c === "," && !inQuote) {
+          result.push(current);
+          current = "";
+        } else {
+          current += c;
         }
       }
+      result.push(current);
+      return result;
+    }
 
-      function renderChart(labels, dataGeral, dataMVP) {
-        const ctx = document.getElementById("radarCanvas").getContext("2d");
+    function parseNumber(value) {
+      if (!value) return 0;
+      let clean = String(value).trim();
+      clean = clean.replace(/^"|"$/g, "");
 
-        const gradientMVP = ctx.createRadialGradient(350, 350, 0, 350, 350, 350);
-        gradientMVP.addColorStop(0, "rgba(80, 200, 255, 0.55)");
-        gradientMVP.addColorStop(1, "rgba(80, 200, 255, 0.12)");
+      // tempo mm:ss para minutos
+      if (clean.includes(":")) {
+        const parts = clean.split(":");
+        const m = parseFloat(parts[0]) || 0;
+        const s = parseFloat(parts[1]) || 0;
+        return m + (s / 60);
+      }
 
-        new Chart(ctx, {
-          type: "radar",
-          data: {
-            labels,
-            datasets: [
-              {
-                label: "MVP",
-                data: dataMVP,
-                backgroundColor: gradientMVP,
-                borderColor: "#50c8ff",
-                borderWidth: 4,
-                pointBackgroundColor: "#50c8ff",
-                pointBorderColor: "#ffffff",
-                pointRadius: 6,
-                pointHoverRadius: 8,
-                fill: true
-              },
-              {
-                label: "Média Geral",
-                data: dataGeral,
-                backgroundColor: "rgba(255, 255, 255, 0.08)",
-                borderColor: "rgba(200, 200, 200, 0.9)",
-                borderWidth: 2,
-                pointRadius: 4,
-                pointBackgroundColor: "rgba(255, 255, 255, 0.9)",
-                pointBorderColor: "#000000",
-                fill: true
-              }
-            ]
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            layout: { padding: 20 },
-            scales: {
-              r: {
-                min: 0,
-                max: 100,
-                beginAtZero: true,
-                angleLines: {
-                  display: true,
-                  color: "rgba(255, 255, 255, 0.28)",
-                  lineWidth: 5
-                },
-                grid: {
-                  circular: false,
-                  color: "rgba(255, 255, 255, 0.2)",
-                  lineWidth: 5
-                },
-                ticks: {
-                  display: false
-                },
-                pointLabels: {
-                  color: "white",
-                  font: {
-                    size: 14,
-                    family: "Verdana",
-                    weight: "bold"
-                  },
-                  padding: 12
-                }
-              }
+      clean = clean.replace(/\s/g, "");
+      if (clean.includes(",")) {
+        clean = clean.replace(/\./g, "");
+        clean = clean.replace(",", ".");
+      }
+
+      return parseFloat(clean) || 0;
+    }
+
+    async function loadAndBuildChart() {
+      try {
+        const resp = await fetch(CSV_URL);
+        const text = await resp.text();
+        const lines = text.trim().split("\n");
+
+        if (lines.length < 2) return;
+
+        const labels = [];
+        const dataGeral = [];
+        const dataMVP = [];
+        const mvpDisplayValues = [];
+
+        // começa em 1 para pular cabeçalho
+        let metricIndex = 0;
+
+        for (let i = 1; i < lines.length && metricIndex < FIXED_CAPS.length; i++) {
+          const row = splitCSVLine(lines[i]);
+          if (row.length < 3) continue;
+
+          const label = row[0].replace(/"/g, "").trim();
+          const valGeralRaw = parseNumber(row[1]);
+          const valMVPRaw = parseNumber(row[2]);
+          const mvpDisplay = row[2].replace(/"/g, "").trim();
+
+          const cap = FIXED_CAPS[metricIndex] || 1;
+
+          const normGeral = Math.min(100, (valGeralRaw / cap) * 100);
+          const normMVP = Math.min(100, (valMVPRaw / cap) * 100);
+
+          labels.push(label);
+          mvpDisplayValues.push(mvpDisplay);
+          dataGeral.push(normGeral);
+          dataMVP.push(normMVP);
+
+          metricIndex++;
+        }
+
+        renderChart(labels, dataGeral, dataMVP, mvpDisplayValues);
+      } catch (err) {
+        console.error("Erro ao carregar dados:", err);
+      }
+    }
+
+    function renderChart(labels, dataGeral, dataMVP, mvpDisplayValues) {
+      const ctx = document.getElementById("radarCanvas").getContext("2d");
+
+      const gradientMVP = ctx.createRadialGradient(350, 350, 0, 350, 350, 350);
+      gradientMVP.addColorStop(0, "rgba(80, 200, 255, 0.55)");
+      gradientMVP.addColorStop(1, "rgba(80, 200, 255, 0.12)");
+
+      // Custom Plugin for Labels
+      const customLabelPlugin = {
+        id: 'customLabelPlugin',
+        afterDraw: (chart) => {
+          const { ctx, scales: { r } } = chart;
+          const dataset = chart.data.datasets[0];
+          const displayValues = dataset.pointDisplayValues;
+          const chartLabels = chart.data.labels;
+
+          if (!displayValues) return;
+
+          // ====================================================================================
+          // ÁREA DE CONFIGURAÇÃO MANUAL (INDIVIDUAL POR MÉTRICA)
+          // Ordem: Topo (12h) -> Sentido Horário
+          // ====================================================================================
+
+          const METRIC_CONFIG = [
+            // 1. Abates (Topo)
+            { dist: 40, valueY: -15, labelY: 25 },
+            // 2. Dano
+            { dist: 65, valueY: -15, labelY: 25 },
+            // 3. Med. SVT
+            { dist: 75, valueY: 30, labelY: 70 },
+            // 4. Rating (Baixo)
+            { dist: 65, valueY: -15, labelY: 25 },
+            // 5. Assistências
+            { dist: 75, valueY: 30, labelY: 70 },
+            // 6. Nocautes
+            { dist: 70, valueY: -15, labelY: 25 }
+          ];
+
+          // ====================================================================================
+
+          ctx.save();
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+
+          chartLabels.forEach((label, i) => {
+            const angle = r.getIndexAngle(i) - (Math.PI / 2);
+
+            // Pega a config específica desta métrica (ou usa padrão se não houver)
+            const config = METRIC_CONFIG[i] || { dist: 65, valueY: -35, labelY: 25 };
+
+            // Distância do centro
+            const dist = r.drawingArea + config.dist;
+
+            const x = r.xCenter + Math.cos(angle) * dist;
+            const y = r.yCenter + Math.sin(angle) * dist;
+
+            // Desenhar valor (Grande, Branco)
+            ctx.font = 'bold 65px "Segoe UI", sans-serif';
+            ctx.fillStyle = 'white';
+            ctx.fillText(displayValues[i], x, y + config.valueY);
+
+            // Desenhar Label (Menor, Cinza/Branco)
+            ctx.font = 'bold 20px "Segoe UI", sans-serif';
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+            ctx.fillText(label.toUpperCase(), x, y + config.labelY);
+          });
+
+          ctx.restore();
+        }
+      };
+
+      new Chart(ctx, {
+        type: "radar",
+        data: {
+          labels,
+          datasets: [
+            {
+              label: "MVP",
+              data: dataMVP,
+              pointDisplayValues: mvpDisplayValues, // Armazena valores reais aqui
+              backgroundColor: gradientMVP,
+              borderColor: "#50c8ff",
+              borderWidth: 4,
+              pointBackgroundColor: "#50c8ff",
+              pointBorderColor: "#ffffff",
+              pointRadius: 6,
+              pointHoverRadius: 8,
+              fill: true
             },
-            plugins: {
-              legend: {
-                display: true,
-                position: "bottom",
-                labels: {
-                  color: "white",
-                  font: { size: 12 }
-                }
-              },
-              tooltip: {
-                enabled: false
-              }
-            },
-            elements: {
-              line: { tension: 0 }
+            {
+              label: "Média Geral",
+              data: dataGeral,
+              backgroundColor: "rgba(255, 255, 255, 0.08)",
+              borderColor: "rgba(200, 200, 200, 0.9)",
+              borderWidth: 2,
+              pointRadius: 4,
+              pointBackgroundColor: "rgba(255, 255, 255, 0.9)",
+              pointBorderColor: "#000000",
+              fill: true
             }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          layout: { padding: 120 }, // Aumentado para 120 para caber fonte 65px
+          scales: {
+            r: {
+              min: 0,
+              max: 100,
+              beginAtZero: true,
+              angleLines: {
+                display: true,
+                color: "rgba(255, 255, 255, 0.28)",
+                lineWidth: 5
+              },
+              grid: {
+                circular: false,
+                color: "rgba(255, 255, 255, 0.2)",
+                lineWidth: 5
+              },
+              ticks: { display: false },
+              pointLabels: { display: false }
+            }
+          },
+          plugins: {
+            legend: {
+              display: false // Removida a legenda
+            },
+            tooltip: { enabled: false }
+          },
+          elements: {
+            line: { tension: 0 }
           }
-        });
-      }
+        },
+        plugins: [customLabelPlugin]
+      });
+    }
 
-      loadAndBuildChart();
-    </script>
-  </body>
+    loadAndBuildChart();
+  </script>
+</body>
+
 </html>
