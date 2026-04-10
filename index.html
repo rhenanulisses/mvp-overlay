@@ -38,7 +38,7 @@
       position: absolute;
       width: 520px;
       height: 520px;
-      background: radial-gradient(circle, rgba(80, 200, 255, 0.25) 0%, rgba(0, 0, 0, 0) 70%);
+      background: radial-gradient(circle, rgba(12, 220, 155, 0.25) 0%, rgba(0, 0, 0, 0) 70%);
       z-index: 1;
       pointer-events: none;
       filter: blur(25px);
@@ -150,8 +150,8 @@
       const ctx = document.getElementById("radarCanvas").getContext("2d");
 
       const gradientMVP = ctx.createRadialGradient(350, 350, 0, 350, 350, 350);
-      gradientMVP.addColorStop(0, "rgba(80, 200, 255, 0.55)");
-      gradientMVP.addColorStop(1, "rgba(80, 200, 255, 0.12)");
+      gradientMVP.addColorStop(0, "rgba(12, 220, 155, 0.55)");
+      gradientMVP.addColorStop(1, "rgba(12, 220, 155, 0.12)");
 
       // Custom Plugin for Labels
       const customLabelPlugin = {
@@ -163,11 +163,6 @@
           const chartLabels = chart.data.labels;
 
           if (!displayValues) return;
-
-          // ====================================================================================
-          // ÁREA DE CONFIGURAÇÃO MANUAL (INDIVIDUAL POR MÉTRICA)
-          // Ordem: Topo (12h) -> Sentido Horário
-          // ====================================================================================
 
           const METRIC_CONFIG = [
             // 1. Abates (Topo)
@@ -184,8 +179,6 @@
             { dist: 70, valueY: -15, labelY: 25 }
           ];
 
-          // ====================================================================================
-
           ctx.save();
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
@@ -193,10 +186,8 @@
           chartLabels.forEach((label, i) => {
             const angle = r.getIndexAngle(i) - (Math.PI / 2);
 
-            // Pega a config específica desta métrica (ou usa padrão se não houver)
             const config = METRIC_CONFIG[i] || { dist: 65, valueY: -35, labelY: 25 };
 
-            // Distância do centro
             const dist = r.drawingArea + config.dist;
 
             const x = r.xCenter + Math.cos(angle) * dist;
@@ -225,11 +216,11 @@
             {
               label: "MVP",
               data: dataMVP,
-              pointDisplayValues: mvpDisplayValues, // Armazena valores reais aqui
+              pointDisplayValues: mvpDisplayValues,
               backgroundColor: gradientMVP,
-              borderColor: "#50c8ff",
+              borderColor: "#0cdc9b",
               borderWidth: 4,
-              pointBackgroundColor: "#50c8ff",
+              pointBackgroundColor: "#0cdc9b",
               pointBorderColor: "#ffffff",
               pointRadius: 6,
               pointHoverRadius: 8,
@@ -251,7 +242,7 @@
         options: {
           responsive: true,
           maintainAspectRatio: false,
-          layout: { padding: 120 }, // Aumentado para 120 para caber fonte 65px
+          layout: { padding: 120 },
           scales: {
             r: {
               min: 0,
@@ -272,16 +263,14 @@
             }
           },
           plugins: {
-            legend: {
-              display: false // Removida a legenda
-            },
+            legend: { display: false },
             tooltip: { enabled: false }
           },
           elements: {
             line: { tension: 0 }
           }
         },
-        plugins: []
+        plugins: [customLabelPlugin]
       });
     }
 
