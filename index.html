@@ -59,6 +59,7 @@
 
     // Abates, Dano, Med. SVT, Rating, Assistências, Nocautes
     const MAX_METRICS = 6;
+    const FIXED_CAPS = [40, 4000, 25, 40, 17, 25];
 
     function splitCSVLine(str) {
       const result = [];
@@ -127,8 +128,7 @@
           const valMVPRaw = parseNumber(row[2]);
           const mvpDisplay = row[2].replace(/"/g, "").trim();
 
-          const maxRaw = Math.max(valMVPRaw, valGeralRaw);
-          const cap = maxRaw > 0 ? maxRaw * 1.30 : 1;
+          const cap = FIXED_CAPS[metricIndex];
 
           const normGeral = Math.min(100, (valGeralRaw / cap) * 100);
           const normMVP = Math.min(100, (valMVPRaw / cap) * 100);
