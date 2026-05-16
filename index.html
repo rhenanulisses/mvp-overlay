@@ -128,7 +128,7 @@
           const valMVPRaw = parseNumber(row[2]);
           const mvpDisplay = row[2].replace(/"/g, "").trim();
 
-          const cap = FIXED_CAPS[metricIndex];
+          const cap = valMVPRaw >= FIXED_CAPS[metricIndex] ? valMVPRaw * 1.15 : FIXED_CAPS[metricIndex];
 
           const normGeral = Math.min(100, (valGeralRaw / cap) * 100);
           const normMVP = Math.min(100, (valMVPRaw / cap) * 100);
