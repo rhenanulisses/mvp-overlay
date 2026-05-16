@@ -38,7 +38,7 @@
       position: absolute;
       width: 520px;
       height: 520px;
-      background: radial-gradient(circle, rgba(12, 220, 155, 0.25) 0%, rgba(0, 0, 0, 0) 70%);
+      background: radial-gradient(circle, rgba(220, 38, 38, 0.25) 0%, rgba(0, 0, 0, 0) 70%);
       z-index: 1;
       pointer-events: none;
       filter: blur(25px);
@@ -58,7 +58,7 @@
       "https://docs.google.com/spreadsheets/d/e/2PACX-1vRFL0QFMjOpvPfxKcAoFqf3avQ9Jrbdy3t7dg91IC2tDauwIvxOIMI9i0bMFGrdtqO4Z-BSi_baVBHr/pub?gid=1084679039&single=true&output=csv";
 
     // Abates, Dano, Med. SVT, Rating, Assistências, Nocautes
-    const FIXED_CAPS = [30, 6000, 30, 8, 25, 30];
+    const MAX_METRICS = 6;
 
     function splitCSVLine(str) {
       const result = [];
@@ -118,7 +118,7 @@
         // começa em 1 para pular cabeçalho
         let metricIndex = 0;
 
-        for (let i = 1; i < lines.length && metricIndex < FIXED_CAPS.length; i++) {
+        for (let i = 1; i < lines.length && metricIndex < MAX_METRICS; i++) {
           const row = splitCSVLine(lines[i]);
           if (row.length < 3) continue;
 
@@ -127,7 +127,7 @@
           const valMVPRaw = parseNumber(row[2]);
           const mvpDisplay = row[2].replace(/"/g, "").trim();
 
-          const cap = FIXED_CAPS[metricIndex] || 1;
+          const cap = valMVPRaw > 0 ? valMVPRaw * 1.30 : 1;
 
           const normGeral = Math.min(100, (valGeralRaw / cap) * 100);
           const normMVP = Math.min(100, (valMVPRaw / cap) * 100);
@@ -150,8 +150,8 @@
       const ctx = document.getElementById("radarCanvas").getContext("2d");
 
       const gradientMVP = ctx.createRadialGradient(350, 350, 0, 350, 350, 350);
-      gradientMVP.addColorStop(0, "rgba(12, 220, 155, 0.55)");
-      gradientMVP.addColorStop(1, "rgba(12, 220, 155, 0.12)");
+      gradientMVP.addColorStop(0, "rgba(220, 38, 38, 0.55)");
+      gradientMVP.addColorStop(1, "rgba(220, 38, 38, 0.12)");
 
       // Custom Plugin for Labels
       const customLabelPlugin = {
@@ -218,9 +218,9 @@
               data: dataMVP,
               pointDisplayValues: mvpDisplayValues,
               backgroundColor: gradientMVP,
-              borderColor: "#0cdc9b",
+              borderColor: "#dc2626",
               borderWidth: 4,
-              pointBackgroundColor: "#0cdc9b",
+              pointBackgroundColor: "#dc2626",
               pointBorderColor: "#ffffff",
               pointRadius: 6,
               pointHoverRadius: 8,
