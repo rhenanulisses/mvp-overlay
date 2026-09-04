@@ -38,7 +38,7 @@
       position: absolute;
       width: 520px;
       height: 520px;
-      background: radial-gradient(circle, rgba(0, 214, 150, 0.25) 0%, rgba(0, 0, 0, 0) 70%);
+      background: radial-gradient(circle, rgba(76, 36, 145, 0.25) 0%, rgba(0, 0, 0, 0) 70%);
       z-index: 1;
       pointer-events: none;
       filter: blur(25px);
@@ -151,8 +151,8 @@
       const ctx = document.getElementById("radarCanvas").getContext("2d");
 
       const gradientMVP = ctx.createRadialGradient(350, 350, 0, 350, 350, 350);
-      gradientMVP.addColorStop(0, "rgba(0, 214, 150, 0.55)");
-      gradientMVP.addColorStop(1, "rgba(0, 214, 150, 0.12)");
+      gradientMVP.addColorStop(0, "rgba(76, 36, 145, 0.55)");
+      gradientMVP.addColorStop(1, "rgba(76, 36, 145, 0.12)");
 
       // Custom Plugin for Labels
       const customLabelPlugin = {
@@ -219,9 +219,9 @@
               data: dataMVP,
               pointDisplayValues: mvpDisplayValues,
               backgroundColor: gradientMVP,
-              borderColor: "#00d696",
+              borderColor: "#4c2491",
               borderWidth: 4,
-              pointBackgroundColor: "#00d696",
+              pointBackgroundColor: "#4c2491",
               pointBorderColor: "#ffffff",
               pointRadius: 6,
               pointHoverRadius: 8,
